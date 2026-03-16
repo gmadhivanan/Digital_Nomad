@@ -1,0 +1,350 @@
+let elecount = 2;
+let rescount = 600;
+let pcount = 2;
+let W = 395;
+let sz = 10;
+let resources = [];
+let popgroups = [];
+let fr = 30;
+let vis = 2;
+let maxVeg = 10;
+let maxEn = maxVeg;
+let spreadThresh = 2;
+let spreadCost = 1;
+let idleTime = maxVeg / 2;
+let seasonTime = 200;
+let seasonCost = maxVeg * 0.9;
+let tic = 0;
+class resource {
+  constructor(x, y, qty, ext, state, neighborct) {
+    this.x = x;
+    this.y = y;
+    this.qty = qty;
+    this.ext = ext;
+    this.state = state;
+    this.neighborct = neighborct;
+  }
+  grow() {
+    this.qty = constrain(this.qty + 1 / fr, 0, maxVeg);
+  }
+  idle() {
+    this.ext = this.ext + 1 / fr;
+    if (this.ext > idleTime) {
+      this.state = 0;
+      this.ext = 0;
+    }
+  }
+  consume() {
+    this.qty = constrain(this.qty - this.neighborct / fr, 0, maxVeg);
+    if (this.qty <= 1) {
+      this.state = 1;
+    }
+  }
+}
+class popgroup {
+  constructor(x, y, energy, state, neighbors, neighbors2) {
+    this.x = x;
+    this.y = y;
+    this.energy = energy;
+    this.state = state;
+
+    class neighbor {
+      constructor(n, ne, e, se, s, sw, w, nw) {
+        this.n = n;
+        this.ne = ne;
+        this.e = e;
+        this.se = se;
+        this.s = s;
+        this.sw = sw;
+        this.w = w;
+        this.nw = nw;
+      }
+    }
+    this.neighbors = new neighbor(
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    );
+    this.neighbors2 = new neighbor(
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    );
+  }
+  consume() {
+    this.energy = constrain(this.energy + 1 / fr, 0, maxEn);
+  }
+  starve() {
+    this.energy = constrain(this.energy - 1 / fr, 0, maxEn);
+  }
+  spread(pIn) {
+    let truesum =
+      this.neighbors2.n +
+      this.neighbors2.ne +
+      this.neighbors2.e +
+      this.neighbors2.se +
+      this.neighbors2.s +
+      this.neighbors2.sw +
+      this.neighbors2.w +
+      this.neighbors2.nw;
+
+    if (this.energy > spreadThresh && truesum < 8) {
+      //console.log(popgroups)
+      neighbor2check(pIn);
+      if (this.neighbors2.n == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x, this.y - 1, spreadCost));
+      } else if (this.neighbors2.ne == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x + 1, this.y - 1, spreadCost));
+      } else if (this.neighbors2.e == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x + 1, this.y, spreadCost));
+      } else if (this.neighbors2.se == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x + 1, this.y + 1, spreadCost));
+      } else if (this.neighbors2.s == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x, this.y + 1, spreadCost));
+      } else if (this.neighbors2.sw == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x - 1, this.y + 1, spreadCost));
+      } else if (this.neighbors2.w == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x - 1, this.y, spreadCost));
+      } else if (this.neighbors2.nw == false) {
+        this.energy = this.energy - spreadCost;
+        popgroups.push(new popgroup(this.x - 1, this.y - 1, spreadCost));
+      }
+    }
+  }
+  neighborsCheck() {
+    let truesum =
+      this.neighbors.n +
+      this.neighbors.ne +
+      this.neighbors.e +
+      this.neighbors.se +
+      this.neighbors.s +
+      this.neighbors.sw +
+      this.neighbors.w +
+      this.neighbors.nw;
+    if (truesum > 0) {
+      this.state = 2;
+    } else {
+      this.state = 1;
+    }
+    this.neighbors.n = false;
+    this.neighbors.ne = false;
+    this.neighbors.e = false;
+    this.neighbors.se = false;
+    this.neighbors.s = false;
+    this.neighbors.sw = false;
+    this.neighbors.w = false;
+    this.neighbors.nw = false;
+  }
+}
+function updateMatrix() {
+  textSize(8);
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i < W / sz; i++) {
+    for (let h = 0; h < W / sz; h++) {
+      x = i + sz + sz * i - sz;
+      y = h + sz + sz * h - sz;
+      fill("white");
+      rect(x, y, sz);
+
+      for (let r = 0; r < resources.length; r++) {
+        if (resources[r].x == i && resources[r].y == h) {
+          //console.log(resources[r].x,resources[r].y,i,h)
+          if (resources[r].qty > 0) {
+            fill("green");
+          } else {
+            fill("#CAB061");
+          }
+
+          rect(x, y, sz);
+          fill("black");
+          //text(resources[r].ext,x+1,y+10)
+        }
+        resources[r].neighborct = 0;
+        for (let p = 0; p < popgroups.length; p++) {
+          if (popgroups[p].x == i && popgroups[p].y == h) {
+            //console.log(popgroups[p].x,pop#673AB7ups[p].y,i,h)
+            if (popgroups[p].energy > 0) {
+              fill("#C0ABE7");
+            } else {
+              fill("gray");
+            }
+
+            rect(x, y, sz);
+            fill("black");
+            text(popgroups[p].energy, x + 1, y + 9);
+          }
+
+          if (popgroups[p].x - 1 == resources[r].x && resources[r].qty > 0) {
+            if (popgroups[p].y - 1 == resources[r].y) {
+              popgroups[p].neighbors.nw = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y == resources[r].y) {
+              popgroups[p].neighbors.w = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y + 1 == resources[r].y) {
+              popgroups[p].neighbors.sw = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+          } else if (popgroups[p].x == resources[r].x && resources[r].qty > 0) {
+            if (popgroups[p].y - 1 == resources[r].y) {
+              popgroups[p].neighbors.n = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y == resources[r].y) {
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y + 1 == resources[r].y) {
+              popgroups[p].neighbors.s = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+          } else if (
+            popgroups[p].x + 1 == resources[r].x &&
+            resources[r].qty > 0
+          ) {
+            if (popgroups[p].y - 1 == resources[r].y) {
+              popgroups[p].neighbors.ne = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y == resources[r].y) {
+              popgroups[p].neighbors.e = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+            if (popgroups[p].y + 1 == resources[r].y) {
+              popgroups[p].neighbors.se = true;
+              resources[r].state = 2;
+              resources[r].neighborct = resources[r].neighborct + 1;
+            }
+          }
+
+          if (popgroups[p].energy <= 0) {
+            popgroups.splice(p, 1);
+          }
+
+          //check other neighbors
+        }
+      }
+    }
+  }
+}
+
+function neighbor2check(p) {
+  for (let p1 = 0; p1 < popgroups.length; p1++) {
+    if (popgroups[p].x - 1 == popgroups[p1].x) {
+      if (popgroups[p].y - 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.nw = true;
+      }
+      if (popgroups[p].y == popgroups[p1].y) {
+        popgroups[p].neighbors2.w = true;
+      }
+      if (popgroups[p].y + 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.sw = true;
+      }
+    } else if (popgroups[p].x == popgroups[p1].x) {
+      if (popgroups[p].y - 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.n = true;
+      }
+
+      if (popgroups[p].y + 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.s = true;
+      }
+    } else if (popgroups[p].x + 1 == popgroups[p1].x) {
+      if (popgroups[p].y - 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.ne = true;
+      }
+      if (popgroups[p].y == popgroups[p1].y) {
+        popgroups[p].neighbors2.e = true;
+      }
+      if (popgroups[p].y + 1 == popgroups[p1].y) {
+        popgroups[p].neighbors2.se = true;
+      }
+    }
+  }
+}
+function winter() {
+  for (let r = 0; r < resources.length; r++) {
+    resources[r].qty = resources[r].qty - seasonCost;
+    resources[r].state = 1;
+  }
+}
+function setup() {
+  createCanvas(W, W);
+  background(220);
+
+  for (let i = 0; i < rescount; i++) {
+    randomSeed(random(0, 400) * i);
+
+    let x = floor(random() * 39);
+    let y = floor(random() * 39);
+    let qty = floor(random() * maxVeg);
+    resources.push(new resource(x, y, qty, 0, 1));
+    //console.log(x,y)
+  }
+  for (let i = 0; i < pcount; i++) {
+    randomSeed(random(0, 400) * i);
+
+    let x = floor(random() * 39);
+    let y = floor(random() * 39);
+    let energy = floor(random() * 10);
+    popgroups.push(new popgroup(x, y, energy));
+  }
+
+  updateMatrix();
+}
+
+function draw() {
+  for (let r = 0; r < resources.length; r++) {
+    if (resources[r].state == 2) {
+      resources[r].consume();
+    } else if (resources[r].state == 1) {
+      resources[r].idle();
+    } else if (resources[r].state == 0) {
+      resources[r].grow();
+    }
+  }
+  for (let p = 0; p < popgroups.length; p++) {
+    if (popgroups[p].state == 2) {
+      popgroups[p].consume();
+      popgroups[p].spread(p);
+    } else if (popgroups[p].state == 1) {
+      popgroups[p].starve();
+    }
+    popgroups[p].neighborsCheck();
+    //console.log(popgroups[p].neighbors.se)
+  }
+  //console.log(popgroups)
+
+  updateMatrix();
+  tic = round(tic + 1);
+  console.log(tic % seasonTime);
+  if (tic % seasonTime == 0) {
+    winter();
+  }
+}
