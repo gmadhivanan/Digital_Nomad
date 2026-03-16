@@ -15,6 +15,7 @@ let idleTime = maxVeg / 2;
 let seasonTime = 200;
 let seasonCost = maxVeg * 0.9;
 let tic = 0;
+let moveCost=0;
 class resource {
   constructor(x, y, qty, ext, state, neighborct) {
     this.x = x;
@@ -84,8 +85,9 @@ class popgroup {
   consume() {
     this.energy = constrain(this.energy + 1 / fr, 0, maxEn);
   }
-  starve() {
+  starve(pIn) {
     this.energy = constrain(this.energy - 1 / fr, 0, maxEn);
+    this.move(pIn)
   }
   spread(pIn) {
     let truesum =
@@ -152,6 +154,43 @@ class popgroup {
     this.neighbors.w = false;
     this.neighbors.nw = false;
   }
+  move(pIn){
+      //console.log(popgroups)
+      neighbor2check(pIn);
+      if (this.neighbors2.n == false) {
+        this.energy = this.energy - moveCost;
+       this.y=this.y-1
+      } else if (this.neighbors2.ne == false) {
+        this.energy = this.energy - moveCost;
+        this.y=this.y-1
+        this.x=this.x+1
+      } else if (this.neighbors2.e == false) {
+        this.energy = this.energy - moveCost;
+       this.x=this.x+1
+      } else if (this.neighbors2.se == false) {
+        this.energy = this.energy - moveCost;
+        this.y=this.y+1
+        this.x=this.x+1
+      } else if (this.neighbors2.s == false) {
+        this.energy = this.energy - moveCost;
+        this.y=this.y+1
+      } else if (this.neighbors2.sw == false) {
+        this.energy = this.energy - moveCost;
+        this.y=this.y+1
+        this.x=this.x-1
+      } else if (this.neighbors2.w == false) {
+        this.energy = this.energy - moveCost;
+        this.x=this.x-1
+      } else if (this.neighbors2.nw == false) {
+        this.energy = this.energy - moveCost;
+      this.y=this.y-1
+        this.x=this.x-1
+      }
+  
+  
+  
+  
+}
 }
 function updateMatrix() {
   textSize(8);
@@ -294,6 +333,7 @@ function winter() {
     resources[r].state = 1;
   }
 }
+
 function setup() {
   createCanvas(W, W);
   background(220);
@@ -334,7 +374,7 @@ function draw() {
       popgroups[p].consume();
       popgroups[p].spread(p);
     } else if (popgroups[p].state == 1) {
-      popgroups[p].starve();
+      popgroups[p].starve(p);
     }
     popgroups[p].neighborsCheck();
     //console.log(popgroups[p].neighbors.se)
